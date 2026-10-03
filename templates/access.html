@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>访问验证｜墨浅 Moqian</title>
+    <meta name="theme-color" content="#050505" />
+    <link rel="icon" href="https://moqian.me/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Noto+Serif+SC:wght@400;600&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050505;
+            --bg-card: #0A0A0A;
+            --bg-elevated: #0D0D0D;
+            --fg: #E5E5E5;
+            --fg-muted: #8C8C8C;
+            --fg-dim: #404040;
+            --border: #1A1A1A;
+            --border-hover: #404040;
+            --grid-line: #0A0A0A;
+            --error: #B77777;
+            --font-mono: 'Space Grotesk', 'Space Mono', system-ui, sans-serif;
+            --font-display: 'Cormorant Garamond', 'Times New Roman', serif;
+            --font-body: 'Noto Serif SC', 'Songti SC', 'STSong', serif;
+            --font-signature: 'Great Vibes', 'Cormorant Garamond', cursive;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font-body);
+            background: var(--bg);
+            min-height: 100vh;
+            color: var(--fg);
+            line-height: 1.9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        ::selection { background-color: var(--fg-dim); color: var(--fg); }
+        :focus:not(:focus-visible) { outline: none; }
+        :focus-visible { outline: 1px dashed var(--fg-muted); outline-offset: 3px; }
+
+        /* The homepage's ASCII moon — lights up once on load */
+        .moon {
+            position: fixed;
+            top: 4.5rem;
+            right: clamp(1rem, 7vw, 7rem);
+            z-index: 0;
+            pointer-events: none;
+            user-select: none;
+            color: #2A2A2A;
+            animation: moon-rise 2.4s ease-out 0.4s forwards;
+        }
+        .moon pre {
+            margin: 0;
+            font-family: var(--font-mono);
+            font-size: clamp(0.42rem, 1vw, 0.62rem);
+            line-height: 1.2;
+            letter-spacing: 0.05em;
+            white-space: pre;
+        }
+        .moon-glow {
+            position: absolute;
+            inset: -45%;
+            background: radial-gradient(ellipse at center, rgba(255, 248, 240, 0.15) 0%, transparent 70%);
+            opacity: 0;
+            z-index: -1;
+            animation: moon-glow-in 2.8s ease-out 0.4s forwards;
+        }
+        @keyframes moon-rise { to { color: #505050; } }
+        @keyframes moon-glow-in { to { opacity: 1; } }
+
+        /* The homepage's crosshair cursor + difference halo (fine pointers only) */
+        @media (hover: hover) and (pointer: fine) {
+            html, body, body * { cursor: none !important; }
+        }
+        .custom-cursor {
+            position: fixed;
+            top: 0; left: 0;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0;
+            will-change: transform;
+        }
+        .custom-cursor svg {
+            display: block;
+            transform-box: fill-box;
+            transform-origin: center;
+            transition: transform 0.25s ease;
+        }
+        .custom-cursor.cursor--active svg { transform: scale(0.7); }
+        .cursor-glow {
+            position: fixed;
+            top: 0; left: 0;
+            width: 200px; height: 200px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 248, 240, 0.25) 0%, transparent 70%);
+            mix-blend-mode: difference;
+            filter: blur(20px);
+            pointer-events: none;
+            z-index: 9998;
+            opacity: 0;
+            will-change: transform;
+        }
+
+        .access-wrap {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 440px;
+            animation: fade-up 0.6s ease both;
+        }
+        @keyframes fade-up {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 2rem;
+        }
+        .brand-signature {
+            display: block;
+            height: 30px;
+            width: auto;
+            overflow: visible;
+        }
+        .brand-signature text {
+            fill: var(--fg);
+            font-family: var(--font-signature);
+            font-size: 28px;
+        }
+        .brand-divider {
+            width: 1px;
+            height: 20px;
+            background: var(--border);
+        }
+        .brand-name {
+            font-size: 0.75rem;
+            color: var(--fg-muted);
+            margin-top: 2px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 2.5rem 2.25rem 2.25rem;
+        }
+        .card-meta {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--fg-muted);
+            margin-bottom: 0.9rem;
+        }
+        .card-meta-line {
+            width: 2rem;
+            height: 1px;
+            background: var(--border-hover);
+        }
+        .card-title {
+            font-family: var(--font-display);
+            font-weight: 500;
+            font-size: 2rem;
+            letter-spacing: -0.02em;
+            line-height: 1.1;
+            color: var(--fg);
+            text-align: center;
+            margin-bottom: 0.4rem;
+        }
+        .card-desc {
+            text-align: center;
+            color: var(--fg-muted);
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .notice {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            padding: 0.9rem 1rem;
+            font-size: 0.75rem;
+            line-height: 1.7;
+            color: var(--fg-muted);
+            display: flex;
+            gap: 0.7rem;
+            margin-bottom: 1.5rem;
+        }
+        .notice svg {
+            flex-shrink: 0;
+            margin-top: 3px;
+            color: var(--fg-muted);
+        }
+        .notice strong { color: var(--fg); font-weight: 600; }
+
+        .field-label {
+            display: block;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: var(--fg-muted);
+            margin-bottom: 0.55rem;
+        }
+        .input-row {
+            position: relative;
+            margin-bottom: 0.9rem;
+        }
+        input[type="password"], input[type="text"] {
+            width: 100%;
+            padding: 0.75rem 2.75rem 0.75rem 1rem;
+            font-size: 0.875rem;
+            font-family: var(--font-body);
+            border: 1px solid var(--border);
+            border-radius: 0;
+            background: var(--bg);
+            color: var(--fg);
+            caret-color: var(--fg);
+            transition: border-color 0.25s ease;
+            outline: none;
+        }
+        input[type="password"]::placeholder, input[type="text"]::placeholder {
+            color: var(--fg-muted);
+            opacity: 0.65;
+        }
+        input[type="password"]:focus, input[type="text"]:focus {
+            border-color: var(--border-hover);
+        }
+        .toggle-visibility {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            color: var(--fg-dim);
+            padding: 6px;
+            display: grid;
+            place-items: center;
+            transition: color 0.2s ease;
+        }
+        .toggle-visibility:hover { color: var(--fg); }
+
+        .error-msg {
+            color: var(--error);
+            font-size: 0.875rem;
+            margin-bottom: 0.9rem;
+            min-height: 1.2em;
+            text-align: center;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 0.8rem 1.25rem;
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
+            font-weight: 500;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--bg);
+            background: var(--fg);
+            border: 1px solid var(--fg);
+            border-radius: 0;
+            cursor: pointer;
+            transition: background 0.25s ease, color 0.25s ease;
+        }
+        .btn-submit:hover {
+            background: transparent;
+            color: var(--fg);
+        }
+        .btn-submit:active { transform: translateY(1px); }
+
+        .footer-tip {
+            margin-top: 1.4rem;
+            text-align: center;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--fg-muted);
+            line-height: 1.7;
+        }
+        .footer-tip a {
+            color: var(--fg-muted);
+            border-bottom: 1px solid var(--border-hover);
+            transition: color 0.25s ease, border-color 0.25s ease;
+        }
+        .footer-tip a:hover {
+            color: var(--fg);
+            border-color: var(--fg);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="starfield" aria-hidden="true" style="position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none"></canvas>
+    <!-- Same desk as moqian.me: the access gate speaks the homepage's world. See the direction contract in templates/index.html. -->
+    <div class="moon" aria-hidden="true"><div class="moon-glow"></div><pre>                        -------
+                 ---------------
+              --------~-------~~~--
+            ------~~---~~---------~~-
+           ------~--~~-~--~~-~-~~---~
+          --~~-~-~~-~--~~--~~~~---~--
+          ---~--~--~~--~~--~--~--~-~--
+         ~-~-~-~~--~-~--~-~-~-~---~---
+         ---~-~--~--~-~-~~--~--~--~-~-
+          -~-~-~-~--~--~-~-~---~-~--~
+           ~-~-~~-~--~~-~~--~~---~--
+            ---~-~--~--~~--~-~-~--
+              -~--~-~-~-~~-~~---
+                 -~-~-~-~---
+                        ~-</pre></div>
+    <div class="access-wrap">
+        <div class="brand">
+            <svg class="brand-signature" viewBox="0 0 98 36" role="img" aria-label="Moqian">
+                <text x="3" y="26">Moqian</text>
+            </svg>
+            <span class="brand-divider"></span>
+            <span class="brand-name">视频下载</span>
+        </div>
+
+        <div class="card">
+            <p class="card-meta">
+                <span>Opus</span>
+                <span class="card-meta-line"></span>
+                <span>Utility · 01</span>
+            </p>
+            <h1 class="card-title">访问验证</h1>
+            <p class="card-desc">本站仅限授权访问，请输入访问码后继续</p>
+
+            <div class="notice">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+                <div>
+                    <strong>使用须知：</strong>本工具可能涉及第三方平台内容下载，存在一定法律风险。仅供经站点持有人授权的访问者在合规范围内使用，且<strong>仅用于学习用途</strong>，请勿用于商业传播或任何侵权用途。继续访问即视为已知悉并自行承担相应责任。
+                </div>
+            </div>
+
+            <form method="POST" action="{{ url_for('access') }}" autocomplete="off" novalidate>
+                <input type="hidden" name="next" value="{{ next_url }}">
+                <label class="field-label" for="code">访问码 · Access Code</label>
+                <div class="input-row">
+                    <input
+                        id="code"
+                        name="code"
+                        type="password"
+                        placeholder="请输入访问码"
+                        autocomplete="off"
+                        autofocus
+                        required
+                    >
+                    <button type="button" class="toggle-visibility" id="toggle-visibility" aria-label="切换显示">
+                        <svg id="eye-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                    </button>
+                </div>
+                <p class="error-msg">{{ error }}</p>
+                <button class="btn-submit" type="submit">进入网站</button>
+            </form>
+
+            <p class="footer-tip">忘记访问码？请联系站点管理员 · <a href="https://moqian.me/">moqian.me</a></p>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/cursor.js') }}?v=1"></script>
+    <script>
+        (function () {
+            const toggle = document.getElementById('toggle-visibility');
+            const input = document.getElementById('code');
+            const eye = document.getElementById('eye-icon');
+            const eyeOpen = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+            const eyeClosed = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+            toggle.addEventListener('click', function () {
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    eye.innerHTML = eyeClosed;
+                } else {
+                    input.type = 'password';
+                    eye.innerHTML = eyeOpen;
+                }
+                input.focus();
+            });
+        })();
+    </script>
+    <script type="module">
+        import { mountStarfield } from "{{ url_for('static', filename='js/starfield.js') }}?v=1";
+        mountStarfield(document.getElementById('starfield'));
+    </script>
+</body>
+</html>

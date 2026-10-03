@@ -1,16 +1,16 @@
 __pycache__/
-*.py[cod]
+*.pyc
 *.pyo
 
 venv/
 .venv/
-env/
-
 bin/
+.impeccable/
 
-downloads/
 cookies/
+downloads/
 
 *.log
-*.tmp
 .env
+.env.*
+!.env.example

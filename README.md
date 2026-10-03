@@ -1,242 +1,100 @@
 # Video Downloader
 
-一个基于 Flask + yt-dlp 的在线视频下载工具，支持 Bilibili、YouTube 等多个视频平台，提供 Web 界面进行视频解析和下载。
+基于 Flask + yt-dlp 的在线视频下载工具，提供 Bilibili、YouTube 视频解析与下载的 Web 界面。
 
-## 功能特性
+## 功能
 
-- **多平台支持**：支持 Bilibili、YouTube 及 yt-dlp 支持的 [1000+ 视频网站](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md)
-- **清晰度选择**：自动解析视频所有可用清晰度，支持 4K、1080p60fps 等高规格格式
-- **Cookie 认证**：支持上传 Cookie 文件，下载需要登录的高清视频（如 Bilibili 大会员专属分辨率）
-- **实时进度**：下载过程中实时显示进度、速度、剩余时间
-- **自动合并**：使用 FFmpeg 自动合并视频流和音频流
-- **图片代理**：解决跨域问题，正常显示视频缩略图
-- **现代化 UI**：响应式设计，支持移动端访问
-
-## 技术栈
-
-- **后端**：Python 3.10+ / Flask
-- **视频解析**：yt-dlp
-- **媒体处理**：FFmpeg
-- **前端**：原生 HTML/CSS/JavaScript
+- 解析视频信息并选择清晰度，使用 FFmpeg 合并音视频。
+- 支持仅下载音频，以及 Bilibili 分 P 选择与批量下载；单个批量任务最多 20 P。
+- 显示下载进度、速度和剩余时间，完成后保存文件。
+- 通过访问码进入工具；下载任务与上传的 Cookie 按浏览器会话隔离。
+- 支持上传 Netscape 格式的 `cookies.txt`，用于需要登录的视频。
+- 灰阶响应式界面，配有星空背景和自定义光标。
 
 ## 环境要求
 
-- Python 3.10 或更高版本
-- FFmpeg（用于音视频合并）
+- Python 3.10+，Windows 部署建议使用 Python 3.11 或 3.12。
+- FFmpeg 与 FFprobe：加入系统 `PATH`，或将 Windows 可执行文件放在项目的 `bin/` 目录。
+- 能够访问目标视频平台的网络环境。
 
 ## 快速开始
 
-### 1. 克隆项目
-
-```bash
-git clone https://github.com/your-username/video-downloader.git
-cd video-downloader
-```
-
-### 2. 创建虚拟环境
-
-```bash
-# Windows
+```powershell
+git clone https://github.com/YinLingxiao/Video-downloader.git
+cd Video-downloader
 python -m venv venv
-venv\Scripts\activate
-
-# Linux / macOS
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### 3. 安装依赖
-
-```bash
+.\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+Copy-Item .env.example .env
 ```
 
-### 4. 安装 FFmpeg
+Linux / macOS 使用 `python3 -m venv venv`、`source venv/bin/activate` 和 `cp .env.example .env`。
 
-**Windows:**
-1. 从 [ffmpeg.org](https://ffmpeg.org/download.html) 下载 FFmpeg
-2. 解压后将 `ffmpeg.exe`、`ffprobe.exe` 放入项目的 `bin/` 目录
-3. 或将 FFmpeg 添加到系统 PATH 环境变量
+编辑 `.env`，设置 `VIDEO_ACCESS_CODE` 和 `VIDEO_SECRET_KEY`。可以运行以下命令生成会话密钥，再将输出填入 `VIDEO_SECRET_KEY`：
 
-**Linux (Ubuntu/Debian):**
-```bash
-sudo apt update
-sudo apt install ffmpeg
+```powershell
+python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-**macOS:**
-```bash
-brew install ffmpeg
-```
+| 配置 | 用途 | 默认值 |
+| --- | --- | --- |
+| `VIDEO_ACCESS_CODE` | 访问码，必须设置非空值 | 无 |
+| `VIDEO_SECRET_KEY` | 会话密钥，生产环境应配置稳定值 | 每次启动随机生成 |
+| `VIDEO_COOKIE_SECURE` | HTTPS 部署时设置为 `1`；本地 HTTP 留空 | 关闭 |
+| `MAX_CONCURRENT_DOWNLOADS` | 同时运行的下载任务数 | `3` |
+| `HOST` | 监听地址 | 开发入口 `127.0.0.1`；生产入口 `0.0.0.0` |
+| `PORT` | 监听端口 | `5000` |
 
-### 5. 运行应用
+应用自动读取 `.env`，已有环境变量优先。旧的 `VIDEO_AUTH_PASSWORD` 暂时兼容，建议迁移到 `VIDEO_ACCESS_CODE`。
 
-```bash
+开发启动：
+
+```powershell
 python app.py
 ```
 
-应用将在 `http://127.0.0.1:5000` 启动。
+打开 `http://127.0.0.1:5000`，输入访问码，粘贴视频链接并解析，选择清晰度或分 P 后下载。
 
-## 使用说明
+## 生产部署
 
-### 基本使用
+项目已包含 Waitress，启动方式：
 
-1. 打开浏览器访问 `http://127.0.0.1:5000`
-2. 在输入框中粘贴视频链接（支持 Bilibili、YouTube 等）
-3. 点击「解析」按钮，等待视频信息加载
-4. 从下拉菜单中选择目标清晰度
-5. 点击「下载」按钮开始下载
-6. 下载完成后点击「保存文件」
+```powershell
+python wsgi.py
+```
 
-### Cookie 上传（下载会员视频）
+也可直接指定监听地址：
 
-部分高清视频需要登录才能下载，你可以上传 Cookie 文件来解锁：
+```powershell
+python -m waitress --host=0.0.0.0 --port=5000 app:app
+```
 
-1. 安装浏览器扩展 [Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)
-2. 登录目标网站（Bilibili / YouTube）
-3. 点击扩展图标，导出 Cookie 为 `cookies.txt`
-4. 将文件拖拽到上传区域或点击选择文件上传
+下载任务保存在进程内存中，应使用单进程服务。需要域名与 HTTPS 时，将反向代理指向服务端口，并设置稳定的会话密钥及 `VIDEO_COOKIE_SECURE=1`。
 
-### 清晰度说明
-
-| 标签 | 含义 |
-|------|------|
-| `[A+V]` | 视频流包含音频，可直接下载 |
-| `[V only]` | 纯视频流，下载时自动合并最佳音频 |
-| `60` / `120` | 高帧率视频（如 1080p60） |
+Windows 防火墙、开机自启和反向代理配置见 [Windows Server 部署说明](README-Windows-Deploy.md)。
 
 ## 项目结构
 
-```
-video-downloader/
-├── app.py              # Flask 主程序
-├── requirements.txt    # Python 依赖
-├── .gitignore
-├── README.md
-├── static/
-│   ├── css/
-│   │   └── style.css   # 样式文件
-│   └── js/
-│       └── main.js     # 前端逻辑
-├── templates/
-│   └── index.html      # 主页面模板
-├── bin/                # FFmpeg 二进制文件（需自行放置）
-│   ├── ffmpeg.exe
-│   ├── ffplay.exe
-│   └── ffprobe.exe
-├── cookies/            # Cookie 存储目录（自动创建）
-│   └── cookies.txt
-└── downloads/          # 下载文件目录（自动创建）
+```text
+Video-downloader/
+├── app.py                     Flask 应用、解析与下载接口
+├── wsgi.py                    Waitress 生产入口
+├── requirements.txt           Python 依赖
+├── .env.example               配置模板
+├── static/css/style.css       页面样式
+├── static/js/                 下载交互、光标与星空
+├── templates/index.html       下载页面
+├── templates/access.html      访问码页面
+├── README-Windows-Deploy.md   Windows 部署说明
+└── DESIGN.md                  设计规范
 ```
 
-## API 接口
+`downloads/` 和 `cookies/` 在运行时自动创建，不提交到 Git。下载文件与任务过期时间为 30 分钟，Cookie 文件为 24 小时；清理由定时任务执行。服务重启会丢失内存中的任务记录。
 
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/` | GET | 主页面 |
-| `/api/status` | GET | 获取系统状态（FFmpeg、Cookie） |
-| `/api/formats` | POST | 解析视频信息 |
-| `/api/download` | POST | 创建下载任务 |
-| `/api/task/<task_id>` | GET | 查询任务状态 |
-| `/api/download_file/<task_id>` | GET | 下载完成的文件 |
-| `/api/upload_cookie` | POST | 上传 Cookie 文件 |
-| `/api/delete_cookie` | POST | 删除 Cookie 文件 |
-| `/api/proxy_image` | GET | 图片代理 |
+## 使用说明
 
-## 生产环境部署
-
-### 使用 Gunicorn（Linux/macOS）
-
-```bash
-pip install gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
-```
-
-### 使用 Waitress（Windows）
-
-```bash
-pip install waitress
-waitress-serve --port=5000 app:app
-```
-
-### 使用 Docker
-
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-
-RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-EXPOSE 5000
-
-CMD ["python", "app.py"]
-```
-
-构建并运行：
-```bash
-docker build -t video-downloader .
-docker run -d -p 5000:5000 video-downloader
-```
-
-## 常见问题
-
-### Q: 下载时提示 "FFmpeg not found"
-
-确保 FFmpeg 已正确安装：
-- 方法一：将 `ffmpeg.exe` 放入项目的 `bin/` 目录
-- 方法二：将 FFmpeg 添加到系统 PATH
-
-### Q: 无法下载 1080p 及以上清晰度
-
-YouTube 等平台的高清视频通常采用 DASH 技术，音视频分离。本工具会自动合并，但需要 FFmpeg 支持。
-
-### Q: Bilibili 提示 "需要登录"
-
-上传 Bilibili 的 Cookie 文件即可。确保导出 Cookie 时已登录账号。
-
-### Q: 下载速度很慢
-
-下载速度取决于：
-- 你的网络环境
-- 视频源服务器的速度
-- 是否需要代理访问
-
-可以通过配置代理来改善：
-```python
-# 在 app.py 的 ydl_opts 中添加
-ydl_opts = {
-    ...
-    "proxy": "http://127.0.0.1:7890",
-}
-```
-
-## 注意事项
-
-- Cookie 文件包含登录凭证，请勿分享给他人
-- Cookie 有有效期，过期后需重新上传
-- 本工具仅供个人学习使用，请尊重视频创作者的版权
-- 下载的内容请勿用于商业用途或二次传播
-
-## 许可证
-
-[MIT License](LICENSE)
-
-## 致谢
-
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) - 强大的视频下载库
-- [Flask](https://flask.palletsprojects.com/) - Python Web 框架
-- [FFmpeg](https://ffmpeg.org/) - 多媒体处理工具
-
----
-
-<div align="center">
-
-### 博觀而約取，厚積而薄發
-
-=======
+- 当前链接白名单支持 Bilibili、YouTube 及其短链接。
+- 上传的 Cookie 属于当前会话，过期后需重新导出并上传。
+- 高清视频可能需要平台账号权限以及 FFmpeg；上传 Cookie 不会改变账号权限。
+- 下载耗时取决于网络、源站限制和媒体处理速度。
+- `.env`、Cookie、下载文件、本机虚拟环境和 FFmpeg 二进制均不上传。请妥善保管访问码与 Cookie，并遵守平台规则及内容授权。
